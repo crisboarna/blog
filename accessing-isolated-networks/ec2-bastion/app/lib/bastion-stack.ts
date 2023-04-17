@@ -24,10 +24,10 @@ export class BastionStack extends cdk.Stack {
         });
 
         const profile = this.node.tryGetContext('profile');
-
-        const createSshKeyCommand = 'ssh-keygen -t rsa -f my_rsa_key';
-        const pushSshKeyCommand = `aws ec2-instance-connect send-ssh-public-key --region ${cdk.Aws.REGION} --instance-id ${bastionHost.instanceId} --availability-zone ${bastionHost.instanceAvailabilityZone} --instance-os-user ec2-user --ssh-public-key file://my_rsa_key.pub ${profile ? `--profile ${profile}` : ''}`;
-        const sshCommand = `ssh -o "IdentitiesOnly=yes" -i my_rsa_key ec2-user@${bastionHost.instancePublicDnsName}`;
+        // Run following commands on stack creation completion to land with terminal inside of bastion host
+        const createSshKeyCommand = 'ssh-keygen -t rsa -f bastion_rsa_key';
+        const pushSshKeyCommand = `aws ec2-instance-connect send-ssh-public-key --availability-zone ${bastionHost.instanceAvailabilityZone} --instance-id ${bastionHost.instanceId} --instance-os-user ec2-user --region ${cdk.Aws.REGION} --ssh-public-key file://bastion_rsa_key.pub ${profile ? `--profile ${profile}` : ''}`;
+        const sshCommand = `ssh -o "IdentitiesOnly=yes" -i bastion_rsa_key ec2-user@${bastionHost.instancePublicDnsName}`;
 
         new cdk.CfnOutput(this, 'CreateSshKeyCommand', { value: createSshKeyCommand });
         new cdk.CfnOutput(this, 'PushSshKeyCommand', { value: pushSshKeyCommand });
