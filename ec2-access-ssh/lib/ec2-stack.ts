@@ -4,6 +4,7 @@ import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import {InstanceClass, InstanceSize, InstanceType} from "aws-cdk-lib/aws-ec2";
 import {readFileSync} from 'fs';
 import {join} from 'path';
+
 interface Ec2StackProps extends cdk.StackProps {
   vpc: ec2.Vpc;
 }
