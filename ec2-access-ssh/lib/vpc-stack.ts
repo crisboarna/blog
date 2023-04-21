@@ -1,6 +1,7 @@
 import * as cdk from 'aws-cdk-lib';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import {Construct} from "constructs";
+import {IpAddresses} from "aws-cdk-lib/aws-ec2";
 
 export class VpcStack extends cdk.Stack {
   public readonly vpc: ec2.Vpc;
@@ -9,7 +10,7 @@ export class VpcStack extends cdk.Stack {
     super(scope, id, props);
 
     this.vpc = new ec2.Vpc(this, 'VPC', {
-      cidr: '10.0.0.0/16',
+      ipAddresses: IpAddresses.cidr('10.0.0.0/16'),
       maxAzs: 2,
       subnetConfiguration: [
         {
