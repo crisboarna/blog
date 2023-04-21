@@ -9,7 +9,7 @@ export class VpcStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
-    this.vpc = new ec2.Vpc(this, 'VPC', {
+    this.vpc = new ec2.Vpc(this, 'VPC-EC2-Access-SSH', {
       ipAddresses: IpAddresses.cidr('10.0.0.0/16'),
       maxAzs: 2,
       subnetConfiguration: [

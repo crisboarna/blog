@@ -4,11 +4,10 @@ import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import {InstanceClass, InstanceSize, InstanceType} from "aws-cdk-lib/aws-ec2";
 import {readFileSync} from 'fs';
 import {join} from 'path';
-
 interface Ec2StackProps extends cdk.StackProps {
   vpc: ec2.Vpc;
 }
-export class Ec2Stack extends cdk.Stack {
+export class Ec2StackKeyPair extends cdk.Stack {
   constructor(scope: Construct, id: string, props: Ec2StackProps) {
     super(scope, id, props);
 
@@ -22,16 +21,16 @@ export class Ec2Stack extends cdk.Stack {
         ).toString(),
     });
 
-    const securityGroup = new ec2.SecurityGroup(this, 'SG-EC2', {
+    const securityGroup = new ec2.SecurityGroup(this, 'SG-EC2-KeyPair', {
       vpc: vpc,
       allowAllOutbound: true,
       description: 'SG for EC2 Port 22 SSH access',
-      securityGroupName: 'SG-EC2'
+      securityGroupName: 'SG-EC2-KeyPair'
     });
 
     securityGroup.addIngressRule(ec2.Peer.anyIpv4(), ec2.Port.tcp(22), 'SSH access');
 
-    const ec2Instance = new ec2.Instance(this, 'Instance2', {
+    const ec2Instance = new ec2.Instance(this, 'EC2KeyPair', {
       vpc,
       keyName,
       securityGroup,
