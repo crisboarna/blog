@@ -3,6 +3,7 @@ import { Construct } from 'constructs';
 import * as ec2 from "aws-cdk-lib/aws-ec2";
 import * as ecs from 'aws-cdk-lib/aws-ecs';
 import * as iam from 'aws-cdk-lib/aws-iam';
+import * as logs from 'aws-cdk-lib/aws-logs';
 
 interface FargateStackProps extends cdk.StackProps {
   vpc: ec2.Vpc;
@@ -70,7 +71,18 @@ export class FargateStack extends cdk.Stack {
         ec2.Port.tcp(443),
         'Allow inbound HTTPS');
 
-    // define cluster for bastion
+    // create log group for ECS exec audit logs
+    const ecsExecAuditLogGroup = new logs.LogGroup(
+        this,
+        'EcsExecAuditLogGroup',
+        {
+            logGroupName: '/ecs/ecs-exec/audit',
+            removalPolicy: cdk.RemovalPolicy.DESTROY,
+            retention: logs.RetentionDays.ONE_WEEK,
+        }
+    );
+
+    // define cluster for bastion and configure ecs exec auditing
     const cluster = new ecs.Cluster(
         this,
         'BastionCluster',
@@ -79,6 +91,11 @@ export class FargateStack extends cdk.Stack {
           clusterName: 'BastionCluster',
           containerInsights: true,
           enableFargateCapacityProviders: true,
+          executeCommandConfiguration: {
+              logConfiguration: {
+                  cloudWatchLogGroup:ecsExecAuditLogGroup
+              }
+          }
         }
     );
 
@@ -100,13 +117,14 @@ export class FargateStack extends cdk.Stack {
         }
       );
 
-    const ecsExecCommand = `REGION=<region> aws ecs execute-command \\
+    const ecsExecCommand = `export REGION=<region> && aws ecs execute-command \\
     --region $REGION \\
     --cluster BastionCluster \\
     --task $(aws ecs list-tasks --region $REGION --cluster ${cluster.clusterArn} --service-name ${bastionService.serviceName} --query 'taskArns[0]' --output text --no-cli-pager) \\
     --container bastion \\
     --command "/bin/bash" \\
     --interactive`
+
     new cdk.CfnOutput(this, 'ECSExecCommand', { value: ecsExecCommand });
   }
 }
