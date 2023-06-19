@@ -4,21 +4,55 @@ import * as ec2 from "aws-cdk-lib/aws-ec2";
 import * as ecs from 'aws-cdk-lib/aws-ecs';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as logs from 'aws-cdk-lib/aws-logs';
+import * as ecr from 'aws-cdk-lib/aws-ecr';
 
 interface FargateStackProps extends cdk.StackProps {
   vpc: ec2.Vpc;
+  ssmVpcEndpointSG: ec2.ISecurityGroup;
+  ssmMessagesVpcEndpointSG: ec2.ISecurityGroup;
+  ec2MessagesVpcEndpointSG: ec2.ISecurityGroup;
+  logsVpcEndpointSG: ec2.ISecurityGroup;
+  ecrVpcEndpointSG: ec2.ISecurityGroup;
+  ecrDockerVpcEndpoint: ec2.ISecurityGroup;
+  bastionEcrRepo: ecr.Repository;
 }
 
 export class FargateStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: FargateStackProps) {
     super(scope, id, props);
 
-    const {vpc } = props;
+    const {
+        vpc,
+        logsVpcEndpointSG,
+        ec2MessagesVpcEndpointSG,
+        ssmMessagesVpcEndpointSG,
+        ssmVpcEndpointSG,
+        ecrVpcEndpointSG,
+        ecrDockerVpcEndpoint,
+        bastionEcrRepo
+    } = props;
+
+    // create log group for ECS exec audit logs
+    const ecsExecAuditLogGroup = new logs.LogGroup(
+      this,
+      'EcsExecAuditLogGroup',
+      {
+          logGroupName: '/ecs/ecs-exec/audit',
+          removalPolicy: cdk.RemovalPolicy.DESTROY,
+          retention: logs.RetentionDays.ONE_WEEK,
+      }
+    );
 
     // define role for session manager to be used by ECS task
-    const sessionManagerRole = new iam.Role(this, 'SessionManagerRole', {
-      assumedBy: new iam.ServicePrincipal('ecs-tasks.amazonaws.com'),
+    const sessionManagerRole = new iam.Role(
+        this,
+        'SessionManagerRole',
+        {
+          assumedBy: new iam.ServicePrincipal('ecs-tasks.amazonaws.com')
     });
+
+    // grant session manager role access to audit log group
+    ecsExecAuditLogGroup.grantWrite(sessionManagerRole);
 
     // add managed policy to session manager role
     sessionManagerRole.addManagedPolicy(
@@ -32,30 +66,28 @@ export class FargateStack extends cdk.Stack {
             this,
             'BastionFargateTaskDefinition',
             {
-      family: 'Bastion',
-      cpu: 256,
-      memoryLimitMiB: 512,
-      taskRole: sessionManagerRole,
-      executionRole: sessionManagerRole,
-    });
+              family: 'Bastion',
+              cpu: 256,
+              memoryLimitMiB: 512,
+              taskRole: sessionManagerRole,
+              executionRole: sessionManagerRole,
+            }
+    );
 
     // define container for bastion
     const bastionContainer =
         bastionTaskDefinition.addContainer('BastionFargateContainer', {
-      image: ecs.ContainerImage.fromRegistry('amazonlinux'),
-      memoryLimitMiB: 512,
-      containerName: 'bastion',
+      image: ecs.ContainerImage.fromEcrRepository(bastionEcrRepo),
+      // ensure container stays alive
       command: ['sleep', 'infinity'],
       healthCheck: {
+        // ECS will kill the container if it fails to start within 30 seconds
         command: ['CMD-SHELL', 'exit', '0'],
       },
-      essential: true,
-    });
-
-    // add port mapping for bastion to allow outbound/inbound HTTPS
-    bastionContainer.addPortMappings({
-      containerPort: 443,
-      protocol: ecs.Protocol.TCP,
+      // needed for ECS Exec to work
+      linuxParameters: new ecs.LinuxParameters(this, `LinuxParams`, {
+          initProcessEnabled: true,
+      }),
     });
 
     // define security group for bastion
@@ -63,22 +95,34 @@ export class FargateStack extends cdk.Stack {
         new ec2.SecurityGroup(
             this,
             'SecurityGroupBastion',
-            { vpc: vpc }
+            {
+                vpc: vpc,
+                allowAllOutbound: false
+            }
         );
 
-    bastionSecurityGroup.addIngressRule(
-        ec2.Peer.ipv4(vpc.vpcCidrBlock),
-        ec2.Port.tcp(443),
-        'Allow inbound HTTPS');
-
-    // create log group for ECS exec audit logs
-    const ecsExecAuditLogGroup = new logs.LogGroup(
-        this,
-        'EcsExecAuditLogGroup',
-        {
-            logGroupName: '/ecs/ecs-exec/audit',
-            removalPolicy: cdk.RemovalPolicy.DESTROY,
-            retention: logs.RetentionDays.ONE_WEEK,
+    [
+        // needed for ECS Exec to communicate with SSM
+        ssmVpcEndpointSG,
+        ssmMessagesVpcEndpointSG,
+        ec2MessagesVpcEndpointSG,
+        // needed for audit logs to reach CloudWatch
+        logsVpcEndpointSG,
+        // needed for ECS Exec to pull image from ECR
+        ecrVpcEndpointSG,
+        ecrDockerVpcEndpoint
+    ].forEach(
+        (sg) => {
+            bastionSecurityGroup.connections.allowFrom(
+                sg,
+                ec2.Port.tcp(443),
+                'Allow SSM access from Bastion'
+            );
+            bastionSecurityGroup.connections.allowTo(
+                sg,
+                ec2.Port.tcp(443),
+                'Allow SSM access to Bastion'
+            );
         }
     );
 
@@ -89,11 +133,11 @@ export class FargateStack extends cdk.Stack {
         {
           vpc,
           clusterName: 'BastionCluster',
-          containerInsights: true,
-          enableFargateCapacityProviders: true,
           executeCommandConfiguration: {
+              logging: ecs.ExecuteCommandLogging.OVERRIDE,
               logConfiguration: {
-                  cloudWatchLogGroup:ecsExecAuditLogGroup
+                  cloudWatchEncryptionEnabled: false,
+                  cloudWatchLogGroup: ecsExecAuditLogGroup,
               }
           }
         }
@@ -110,8 +154,9 @@ export class FargateStack extends cdk.Stack {
           serviceName: 'BastionService',
           taskDefinition: bastionTaskDefinition,
           securityGroups: [bastionSecurityGroup],
-          vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
-          assignPublicIp: false,
+          // ensure the bastion is deployed to private subnets
+          vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_ISOLATED },
+          // ensure execute command is enabled
           enableExecuteCommand: true,
           desiredCount: 1,
         }
@@ -121,7 +166,6 @@ export class FargateStack extends cdk.Stack {
     --region $REGION \\
     --cluster BastionCluster \\
     --task $(aws ecs list-tasks --region $REGION --cluster ${cluster.clusterArn} --service-name ${bastionService.serviceName} --query 'taskArns[0]' --output text --no-cli-pager) \\
-    --container bastion \\
     --command "/bin/bash" \\
     --interactive`
 

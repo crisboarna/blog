@@ -9,5 +9,14 @@ const vpc = new VpcStack(fargate, 'VpcStack');
 const bastion = new FargateStack(
     fargate,
     'BastionFargateStack',
-    { vpc: vpc.vpc }
+    {
+        vpc: vpc.vpc,
+        logsVpcEndpointSG: vpc.logsVpcEndpointSG,
+        ec2MessagesVpcEndpointSG: vpc.ec2MessagesVpcEndpointSG,
+        ssmMessagesVpcEndpointSG: vpc.ssmMessagesVpcEndpointSG,
+        ssmVpcEndpointSG: vpc.ssmVpcEndpointSG,
+        ecrVpcEndpointSG: vpc.ecrVpcEndpoint,
+        ecrDockerVpcEndpoint: vpc.ecrDockerVpcEndpoint,
+        bastionEcrRepo: vpc.bastionEcrRepo
+    }
 );
