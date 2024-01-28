@@ -1,0 +1,27 @@
+version: '3.9'
+
+services:
+  lambda:
+    build:
+      context: .
+      dockerfile: lambda.Dockerfile
+    image: lambda-example:local
+    hostname: lambda
+    entrypoint: ["/rie-bin/aws-lambda-rie", "/usr/local/bin/npx", "aws-lambda-ric", "main.handler"]
+    ports:
+      - "9000:8080"
+    volumes:
+      - aws-lambda-rie:/rie-bin
+
+  riegateway:
+    build:
+      context: .
+      dockerfile: rie.Dockerfile
+    image: lambda-rie-gateway:local
+    environment:
+      - TARGET_URL=http://lambda:8080
+    volumes:
+      - aws-lambda-rie:/rie-bin
+
+volumes:
+  aws-lambda-rie:
