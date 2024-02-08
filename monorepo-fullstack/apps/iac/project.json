@@ -1,0 +1,66 @@
+{
+  "name": "iac",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/iac/src",
+  "projectType": "application",
+  "targets": {
+    "build": {
+      "executor": "@nx/esbuild:esbuild",
+      "outputs": ["{options.outputPath}"],
+      "defaultConfiguration": "production",
+      "options": {
+        "main": "apps/iac/src/main.ts",
+        "outputPath": "dist/apps/iac",
+        "outputFileName": "main.js",
+        "tsConfig": "apps/iac/tsconfig.app.json",
+        "assets": []
+      },
+      "configurations": {
+        "development": {
+          "minify": false
+        },
+        "production": {
+          "minify": true
+        }
+      }
+    },
+    "lint": {
+      "command": "eslint apps/iac/**/*.ts"
+    },
+    "package": {
+      "executor": "@nx-iac/aws-cdk:synthesize",
+      "dependsOn": ["build"],
+      "outputs": ["{options.output}"],
+      "options": {
+        "output": "cdk.out/apps/iac",
+        "quiet": true
+      }
+    },
+    "deploy": {
+      "executor": "@nx-iac/aws-cdk:deploy",
+      "dependsOn": ["package"],
+      "defaultConfiguration": "normal",
+      "options": {
+        "app": "cdk.out/apps/iac",
+        "stacks": "--all"
+      },
+      "configurations": {
+        "normal": {},
+        "quick": {
+          "hotswapFallback": true,
+          "noRollback": true
+        }
+      }
+    },
+    "destroy": {
+      "executor": "@nx-iac/aws-cdk:destroy",
+      "dependsOn": ["package"],
+      "options": {
+        "app": "cdk.out/apps/iac",
+        "stacks": "--all",
+        "force": true
+      }
+    }
+  },
+  "tags": []
+}
