@@ -1,0 +1,10 @@
+{
+  "scripts": {
+    "deploy:vpc": "npx cdk deploy EngineerMindscape-VPC-DEMO",
+    "deploy:ecs": "npx cdk deploy EngineerMindscape-ECS-DEMO",
+    "deploy:efs": "npx cdk deploy EngineerMindscape-EFS-DEMO",
+    "deploy:efs:util": "npx cdk deploy EngineerMindscape-ECS-EFS-Util-DEMO",
+    "shell:efs:util": "./ecs-exec.sh DEMO EFS-Util",
+    "destroy": "npx cdk destroy --all"
+  }
+}
