@@ -1,0 +1,72 @@
+// For format details, see https://aka.ms/devcontainer.json. For config options, see the
+// README at: https://github.com/devcontainers/templates/tree/main/src/python
+{
+    "name": "Enginner Mindscape Spark Cluster",
+    "dockerComposeFile": "../docker/compose.yaml",
+    "service": "devcontainer",
+    "workspaceFolder": "/workspace",
+    // Features to add to the dev container. More info: https://containers.dev/features.
+    "features": {
+        "ghcr.io/devcontainers/features/common-utils:2": {
+            "installZsh": true,
+            "configureZshAsDefaultShell": true,
+            "installOhMyZsh": true,
+            "installOhMyZshConfig": true,
+            "username": "vscode",
+            "userUid": "1001",
+            "userGid": "1001"
+        },
+        "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {
+            "moby": true,
+            "installDockerBuildx": true,
+            "version": "latest",
+            "dockerDashComposeVersion": "v2"
+        },
+        "ghcr.io/stuartleeks/dev-container-features/shell-history:0": {}
+    },
+    // Use 'forwardPorts' to make a list of ports inside the container available locally.
+    // "forwardPorts": [],
+    "postStartCommand": "/workspace/.devcontainer/scripts/start.sh ${containerWorkspaceFolder}",
+    "customizations": {
+        "vscode": {
+            "settings": {
+                "[python]": {
+                    "editor.defaultFormatter": "ms-python.black-formatter",
+                    "editor.formatOnSave": true,
+                    "editor.codeActionsOnSave": {
+                        "source.organizeImports": true
+                    },
+                },
+                "isort.args": [
+                    "--profile",
+                    "black"
+                ],
+                "isort.interpreter": [
+                    "/home/vscode/.pyenv/versions/3.9.21/bin/python"
+                ],
+                "black-formatter.interpreter": [
+                    "/home/vscode/.pyenv/versions/3.9.21/bin/python"
+                ],
+                "python.linting.enabled": true,
+                "python.linting.pylintEnabled": true,
+                "python.testing.pytestEnabled": false,
+                "python.pythonPath": "/home/vscode/.pyenv/versions/3.9.21/bin/python",
+                "jupyter.jupyterServerType": "local",
+                "jupyter.pythonPath": "/home/vscode/.pyenv/versions/3.9.21/bin/python"
+            },
+            "extensions": [
+                "ms-python.python",
+                "njpwerner.autodocstring",
+                "ms-python.pylint",
+                "ms-toolsai.jupyter",
+                "ms-azuretools.vscode-docker",
+                "mechatroner.rainbow-csv",
+                "ms-python.vscode-pylance",
+                "ms-python.isort",
+                "vscode-icons-team.vscode-icons",
+                "ms-python.black-formatter",
+                "eamodio.gitlens"
+            ]
+        }
+    }
+}

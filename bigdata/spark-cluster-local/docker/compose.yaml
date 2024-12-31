@@ -1,0 +1,129 @@
+name: engineermindscape
+services:
+  # service where VsCode will connect to and which will be the "development"
+  devcontainer:
+    build:
+      # we setup the context to the root of the project
+      context: ..
+      # we specify the dockerfile to use
+      dockerfile: docker/Dockerfile
+      # we specify the target to use in the multi-stage build Dockerfile
+      target: devcontainer
+    container_name: devcontainer
+    # we specify the default environment variables, as we are assuming an AWS EMR production environment, we use some default values
+    environment:
+      - AWS_REGION=us-east-1
+    volumes:
+      - ..:/workspace:cached
+      # we mount the ssh keys to be able to connect to git repositories and other services, mounted as read-only
+      - ~/.ssh:/home/vscode/.ssh:ro
+      # we mount the aws credentials to be able to connect to AWS services, mounted as read-only
+      - ~/.aws:/home/vscode/.aws:ro
+      # we mount the zshrc file to be able to customize the shell, mounted as read-only
+      - ~/.zshrc:/tmp/.zshrc:ro
+    networks:
+      - engineermindscape
+
+  spark-master:
+    build:
+      # we setup the context to the current directory
+      context: .
+      # we specify the dockerfile to use
+      dockerfile: Dockerfile
+      # we specify the target to use in the multi-stage build Dockerfile
+      target: spark
+    container_name: spark_master
+    hostname: spark-master
+    ports:
+      # we specify the port to expose the Spark UI
+      - "9090:8080"
+      # we specify the port to expose the Spark Master
+      - "7077:7077"
+    volumes:
+      # we mount the pipelines directory to be able to access the pipelines code by the Spark Master
+      - ../pipelines:/workspace/pipelines
+      # we mount the data directory to be able to access the data by the Spark Master for processing of the data
+      - ../data:/workspace/data
+      # we mount the aws credentials to be able to connect to AWS services, mounted as read-only
+      - ~/.aws:/root/.aws:ro
+    environment:
+      # we specify the environment variables for the Spark Master
+      - SPARK_LOCAL_IP=spark_master
+      - SPARK_WORKLOAD=master
+    networks:
+      - engineermindscape
+
+  spark-worker-1:
+    build:
+      # we setup the context to the current directory
+      context: .
+      # we specify the dockerfile to use
+      dockerfile: Dockerfile
+      # we specify the target to use in the multi-stage build Dockerfile
+      target: spark
+    container_name: spark_worker_1
+    hostname: spark-worker-1
+    ports:
+      # we specify the port to expose the Spark UI
+      - "9091:8080"
+      # we specify the port to expose the Spark Worker
+      - "7001:7000"
+    depends_on:
+      # we specify the dependency on the Spark Master
+      - spark-master
+    environment:
+      - SPARK_MASTER=spark://spark-master:7077
+      - SPARK_WORKER_CORES=1
+      - SPARK_WORKER_MEMORY=1G
+      - SPARK_DRIVER_MEMORY=1G
+      - SPARK_EXECUTOR_MEMORY=1G
+      - SPARK_WORKLOAD=worker
+      - SPARK_LOCAL_IP=spark-worker-1
+    volumes:
+      # we mount the pipelines directory to be able to access the pipelines code by the Spark Worker
+      - ../pipelines:/workspace/pipelines
+      # we mount the data directory to be able to access the data by the Spark Worker for processing of the data
+      - ../data:/workspace/data
+      # we mount the aws credentials to be able to connect to AWS services, mounted as read-only
+      - ~/.aws:/root/.aws:ro
+    networks:
+      - engineermindscape
+
+  spark-worker-2:
+    build:
+      # we setup the context to the current directory
+      context: .
+      # we specify the dockerfile to use
+      dockerfile: Dockerfile
+      # we specify the target to use in the multi-stage build Dockerfile
+      target: spark
+    container_name: spark_worker_2
+    hostname: spark-worker-2
+    ports:
+      # we specify the port to expose the Spark UI
+      - "9092:8080"
+      # we specify the port to expose the Spark Worker
+      - "7002:7000"
+    depends_on:
+      # we specify the dependency on the Spark Master
+      - spark-master
+    environment:
+      - SPARK_MASTER=spark://spark-master:7077
+      - SPARK_WORKER_CORES=1
+      - SPARK_WORKER_MEMORY=1G
+      - SPARK_DRIVER_MEMORY=1G
+      - SPARK_EXECUTOR_MEMORY=1G
+      - SPARK_WORKLOAD=worker
+      - SPARK_LOCAL_IP=spark-worker-2
+    volumes:
+      # we mount the pipelines directory to be able to access the pipelines code by the Spark Worker
+      - ../pipelines:/workspace/pipelines
+      # we mount the data directory to be able to access the data by the Spark Worker for processing of the data
+      - ../data:/workspace/data
+      # we mount the aws credentials to be able to connect to AWS services, mounted as read-only
+      - ~/.aws:/root/.aws:ro
+    networks:
+      - engineermindscape
+
+networks:
+  engineermindscape:

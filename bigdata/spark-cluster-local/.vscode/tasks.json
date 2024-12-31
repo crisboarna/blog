@@ -1,0 +1,17 @@
+{
+    // See https://go.microsoft.com/fwlink/?LinkId=733558
+    // for the documentation about the tasks.json format
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "[Demo Step] - Run",
+            "type": "shell",
+            "command": "/opt/spark/bin/spark-submit --master spark://spark-master:7077 --driver-memory 1G --executor-memory 1G /workspace/pipelines/main.py"
+        },
+        {
+            "label": "[PyCache] - Clean",
+            "type": "shell",
+            "command": "find . -type d -name __pycache__ -exec rm -rf {} +"
+        }
+    ]
+}
